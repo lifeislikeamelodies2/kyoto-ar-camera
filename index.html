@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111111">
-  <title>京都旅行ARカメラ V3.8.1</title>
+  <title>京都旅行ARカメラ V3.9</title>
 
   <style>
     :root {
@@ -977,6 +977,76 @@
       }
     }
 
+  
+    /* ===== V3.9: 操作パネル開閉 ===== */
+    .topbarActions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .menuToggle {
+      flex: 0 0 44px;
+      width: 44px;
+      min-height: 44px;
+      padding: 0;
+      font-size: 22px;
+      line-height: 1;
+      font-weight: 700;
+    }
+
+    .app.controls-collapsed .controlScroll {
+      display: none !important;
+    }
+
+    .app.controls-collapsed .stage {
+      width: min(
+        100%,
+        calc((var(--app-height, 100dvh) - 185px) * 0.75)
+      );
+    }
+
+    @media (max-width: 430px) {
+      .topbarActions {
+        gap: 5px;
+      }
+
+      .menuToggle {
+        flex-basis: 42px;
+        width: 42px;
+        min-height: 42px;
+      }
+
+      #switchCamera {
+        padding-inline: 8px;
+        font-size: 12px;
+      }
+    }
+
+    @media (orientation: landscape) {
+      .app.controls-collapsed {
+        grid-template-columns: minmax(0, 1fr) minmax(250px, .48fr);
+        grid-template-rows: auto minmax(0, 1fr);
+        grid-template-areas:
+          "topbar topbar"
+          "camera capture";
+      }
+
+      .app.controls-collapsed .stage {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        aspect-ratio: 4 / 3 !important;
+      }
+
+      .app.controls-collapsed .shootZoomRow {
+        align-self: end;
+      }
+    }
+
   </style>
 </head>
 
@@ -984,7 +1054,18 @@
   <main class="app">
     <div class="topbar">
       <h1 class="title">京都旅行ARカメラ</h1>
-      <button id="switchCamera" type="button" disabled>内／外カメラ切替</button>
+      <div class="topbarActions">
+        <button
+          id="toggleControls"
+          class="menuToggle"
+          type="button"
+          aria-expanded="true"
+          aria-controls="controlScroll"
+          aria-label="操作パネルを隠す"
+          title="スタンプ操作を表示／非表示"
+        >×</button>
+        <button id="switchCamera" type="button" disabled>内／外カメラ切替</button>
+      </div>
     </div>
 
     <section id="stage" class="stage" aria-label="カメラプレビュー">
@@ -1143,6 +1224,9 @@
       const startLayer = document.getElementById('startLayer');
       const startCameraBtn = document.getElementById('startCamera');
       const switchCameraBtn = document.getElementById('switchCamera');
+      const toggleControlsBtn = document.getElementById('toggleControls');
+      const appEl = document.querySelector('.app');
+      const controlScrollEl = document.getElementById('controlScroll');
       const shootBtn = document.getElementById('shoot');
       const zoomSlider = document.getElementById('zoomSlider');
       const zoomValueEl = document.getElementById('zoomValue');
@@ -1317,6 +1401,42 @@
       function setCameraZoom(value) {
         cameraZoom = clampCameraZoom(value);
         updateZoomDisplay();
+      }
+
+      let controlsCollapsed = false;
+
+      function setControlsCollapsed(collapsed) {
+        controlsCollapsed = Boolean(collapsed);
+
+        appEl.classList.toggle(
+          'controls-collapsed',
+          controlsCollapsed
+        );
+
+        controlScrollEl.setAttribute(
+          'aria-hidden',
+          String(controlsCollapsed)
+        );
+
+        toggleControlsBtn.textContent =
+          controlsCollapsed ? '☰' : '×';
+
+        toggleControlsBtn.setAttribute(
+          'aria-expanded',
+          String(!controlsCollapsed)
+        );
+
+        toggleControlsBtn.setAttribute(
+          'aria-label',
+          controlsCollapsed
+            ? '操作パネルを表示する'
+            : '操作パネルを隠す'
+        );
+
+        toggleControlsBtn.title =
+          controlsCollapsed
+            ? 'スタンプ操作を表示'
+            : 'スタンプ操作を非表示';
       }
 
       function setStatus(text) {
@@ -2323,6 +2443,10 @@
 
       startCameraBtn.addEventListener('click', startCamera);
       switchCameraBtn.addEventListener('click', switchCamera);
+
+      toggleControlsBtn.addEventListener('click', () => {
+        setControlsCollapsed(!controlsCollapsed);
+      });
 
       resetBtn.addEventListener('click', resetActiveStamp);
 
