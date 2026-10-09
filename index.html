@@ -1047,6 +1047,8 @@
       }
     }
 
+    #recordOnMap { grid-column: 1 / -1; background: #425f4c; border-color: #64846c; color: #fff; }
+    #mapRecordStatus:empty { display: none; }
   </style>
 </head>
 
@@ -1168,14 +1170,19 @@
     <div class="previewButtons">
       <button id="retake" type="button">撮り直す</button>
       <button id="save" class="save" type="button">保存・共有</button>
+      <button id="recordOnMap" type="button" disabled>地図で記録する</button>
     </div>
 
+    <p id="mapRecordStatus" class="hint" role="status" aria-live="polite"></p>
     <p class="hint">
       iPhone／iPadでは共有メニューから「画像を保存」を選ぶと写真アプリへ保存できます。
     </p>
   </dialog>
 
   <canvas id="canvas" hidden></canvas>
+  <script src="map/core.js?v=1"></script>
+  <script src="map/store.js?v=1"></script>
+  <script src="map/camera-bridge.js?v=1"></script>
 
   <script>
     (() => {
@@ -2246,6 +2253,7 @@
           return;
         }
 
+        const shotMeta = window.TravelCapture?.begin();
         const rect = stage.getBoundingClientRect();
         const pixelRatio = Math.min(devicePixelRatio || 1, 3);
 
@@ -2351,6 +2359,7 @@
           }
 
           latestBlob = blob;
+          if (shotMeta) window.TravelCapture?.ready(blob, shotMeta);
 
           if (latestObjectUrl) {
             URL.revokeObjectURL(latestObjectUrl);
@@ -2559,3 +2568,4 @@
   </script>
 </body>
 </html>
+
