@@ -8,11 +8,13 @@
   <meta name="description" content="AR写真とともに、京都で歩いた道を残す。撮影地点から自分だけの旅の地図を。">
   <title>旅のしるし｜京都の写真地図</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="style.css?v=20261011-marker-fix">
+  <link rel="stylesheet" href="style.css?v=20261011-exif">
   <script defer src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
   <script defer src="core.js?v=1"></script>
   <script defer src="store.js?v=1"></script>
-  <script defer src="app.js?v=1"></script>
+  <script defer src="vendor/exifr-7.1.3.js"></script>
+  <script defer src="photo-metadata.js?v=20261011-exif"></script>
+  <script defer src="app.js?v=20261011-exif"></script>
 </head>
 <body>
   <svg class="sprite" xmlns="http://www.w3.org/2000/svg"><defs>
@@ -64,7 +66,17 @@
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <dialog id="photoDialog" class="modal photo-modal"><button class="close" data-close="photoDialog" aria-label="閉じる">×</button><img id="largePhoto" alt="記録した旅の写真"><div class="modal-body"><p class="eyebrow" id="photoDate"></p><h2 id="photoTitle">旅の写真</h2><p class="small" id="photoLocation"></p><label class="field">写真のメモ<input id="photoMemo" maxlength="100" placeholder="この場所での思い出"></label><div class="actions"><button id="saveMemo" class="primary">メモを保存</button><button id="placePhoto" class="secondary">地点を指定・修正</button></div><div class="actions"><button id="downloadPhoto" class="quiet">写真を保存</button><button id="deletePhoto" class="quiet danger">写真を削除</button></div></div></dialog>
   <dialog id="settingsDialog" class="modal"><button class="close" data-close="settingsDialog" aria-label="閉じる">×</button><div class="modal-body"><p class="eyebrow">PREFERENCES</p><h2>旅の設定</h2><label class="field">新しく刺すピンの色<select id="colorMode"><option value="count">累計のピン数で変える</option><option value="distance">確定ルートの累計距離で変える</option></select></label><div id="colorLegend" class="color-legend"></div><p class="small">すでに刺したピンは当時の色を残します。</p><label class="check-row"><input id="zoomLimit" type="checkbox">旅の距離に応じて地図の縮小範囲を広げる</label><p class="small">近くの道を見るための拡大は、いつでもできます。</p><hr><h3>思い出のバックアップ</h3><p class="small">写真と記録は、この端末のこのブラウザに保存されます。GitHubには送信されません。ブラウザのデータ消去や端末変更に備えて、バックアップを保存してください。</p><div class="actions"><button id="exportBtn" class="secondary">すべて書き出す</button><button id="importBtn" class="secondary">読み込む</button></div><p class="fine">読み込みは追加方式です。同じ写真ID・同じ日付のルートは、バックアップの内容で置き換わります。</p><hr><h3>地図について</h3><p class="small">現在の地図を古地図風に表示しています。GPSは撮影地点と現在地の表示に使い、移動履歴の常時記録は行いません。ルートの距離は、確認して保存した線から求めた目安です。日時は日本時間で表示します。</p><p class="fine">地図の表示と経路候補の取得には通信が必要です。端末の方位は対応機種と許可状況によって利用できない場合があり、センサー誤差を含みます。</p><p class="fine"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://routing.openstreetmap.de/about.html" target="_blank" rel="noopener">経路：FOSSGIS / OSRM</a> · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">地図の修正</a></p></div></dialog>
-  <dialog id="uploadDialog" class="modal"><button class="close" data-close="uploadDialog" aria-label="閉じる">×</button><form id="uploadForm" class="modal-body"><p class="eyebrow">ADD A MEMORY</p><h2>写真を地図に残す</h2><label class="field">写真<input id="photoFile" type="file" accept="image/jpeg,image/png,image/webp" required></label><label class="field">撮影日時（日本時間）<input id="photoTime" type="datetime-local" required></label><p class="small">日時を確認して追加したあと、地図をタップして撮影地点を指定してください。</p><button class="primary full" type="submit">写真を追加して地点を選ぶ</button></form></dialog>
+  <dialog id="uploadDialog" class="modal"><button class="close" data-close="uploadDialog" aria-label="閉じる">×</button><form id="uploadForm" class="modal-body">
+    <p class="eyebrow">ADD A MEMORY</p><h2>写真を地図に残す</h2>
+    <label class="field">写真<input id="photoFile" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,.heic,.heif" required></label>
+    <p id="photoMetadataStatus" class="small" role="status" aria-live="polite">写真を選ぶと、撮影場所と日時を読み取ります。</p>
+    <label class="field">撮影日時（日本時間）<input id="photoTime" type="datetime-local" step="1" required></label>
+    <p id="photoTimeNote" class="fine">写真の撮影日時を確認してください。</p>
+    <div id="photoGpsSection" hidden><label class="check-row"><input id="usePhotoGps" type="checkbox" checked>写真に記録された撮影場所を使う</label><p id="photoGpsCoordinates" class="small"></p><div id="uploadLocationPreview" aria-label="読み取った撮影地点の確認用地図"></div><p id="photoGpsPreviewStatus" class="fine" role="status"></p></div>
+    <p id="photoUploadHelp" class="small">位置情報がない場合は、保存後に地図から撮影地点を指定できます。</p>
+    <button id="photoUploadSubmit" class="primary full" type="submit" disabled>写真を選択してください</button>
+    <p class="fine">写真の情報はこのブラウザ内で読み取ります。</p>
+  </form></dialog>
   <input id="backupFile" type="file" accept="application/json,.json" hidden>
 </body>
 </html>

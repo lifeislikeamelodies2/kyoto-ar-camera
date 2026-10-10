@@ -126,7 +126,7 @@
     const p=state.photos.find(x=>x.id===id);if(!p)return;state.selected=id;
     if(largeUrl)URL.revokeObjectURL(largeUrl);largeUrl=URL.createObjectURL(p.blob);$('largePhoto').src=largeUrl;
     $('photoDate').textContent=stamp(p.capturedAt);$('photoTitle').textContent=p.title||'旅の写真';$('photoMemo').value=p.title||'';
-    $('photoLocation').textContent=p.point?`${p.point[1].toFixed(5)}, ${p.point[0].toFixed(5)}${p.accuracy?' · GPS精度の目安 ±'+Math.round(p.accuracy)+'m':' · 手動指定'}`:'位置情報がありません。地図上で撮影地点を指定できます。';
+    $('photoLocation').textContent=p.point?`${p.point[1].toFixed(5)}, ${p.point[0].toFixed(5)}${p.accuracy?' · GPS精度の目安 ±'+Math.round(p.accuracy)+'m':p.originalMetadata?.point?.every((v,i)=>v===p.point[i])?' · 写真の位置情報':' · 手動指定'}`:'位置情報がありません。地図上で撮影地点を指定できます。';
     $('photoDialog').showModal();
   }
   function renderRoutePanel(){
@@ -251,7 +251,7 @@
       const raw=atob(p.image.split(',')[1]),bytes=Uint8Array.from(raw,c=>c.charCodeAt(0)),mime=p.image.slice(5,p.image.indexOf(';'));const blob=new Blob([bytes],{type:mime});
       // Decode images before the atomic write; malformed backups cannot partially replace records.
       const bitmap=await createImageBitmap(blob);bitmap.close();
-      photos.push({id:p.id,title:p.title,capturedAt:p.capturedAt,point:p.point,accuracy:Number.isFinite(p.accuracy)?p.accuracy:null,positionAt:p.positionAt||null,color:C.colors.includes(p.color)?p.color:C.colors[0],source:p.source==='ar-camera'?'ar-camera':'import',blob});
+      photos.push({id:p.id,title:p.title,capturedAt:p.capturedAt,point:p.point,accuracy:Number.isFinite(p.accuracy)?p.accuracy:null,positionAt:p.positionAt||null,color:C.colors.includes(p.color)?p.color:C.colors[0],source:p.source==='ar-camera'?'ar-camera':'import',originalMetadata:PhotoMetadata.original(p.originalMetadata),blob});
     }
     for(const r of b.routes){C.validateRoute(r);if(r.confirmed!==true||!Number.isFinite(Date.parse(r.updatedAt)))throw new Error('ルートの保存情報が正しくありません。');}
     if(!confirm(`${photos.length}枚の写真と${b.routes.length}日分のルートを読み込みます。同じ写真ID・同じ日付のルートは置き換わります。よろしいですか？`))return;
@@ -263,11 +263,61 @@
     const url=URL.createObjectURL(file);
     try{const img=new Image();img.src=url;await img.decode();const scale=Math.min(1,1800/Math.max(img.naturalWidth,img.naturalHeight)),canvas=document.createElement('canvas');canvas.width=Math.round(img.naturalWidth*scale);canvas.height=Math.round(img.naturalHeight*scale);const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);return await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('写真を読み込めませんでした。')),'image/jpeg',.9));}finally{URL.revokeObjectURL(url);}
   }
+  let uploadTicket=0,uploadFile=null,uploadMetadata=null,uploadReading=false,uploadSaving=false,uploadMap=null;
+  function clearUploadMap(){if(uploadMap){uploadMap.remove();uploadMap=null;}}
+  function resetUpload(){
+    uploadTicket++;uploadFile=null;uploadMetadata=null;uploadReading=false;clearUploadMap();
+    $('uploadForm').reset();$('photoTime').value='';$('photoTime').disabled=false;$('photoFile').disabled=false;
+    $('photoGpsSection').hidden=true;$('photoMetadataStatus').textContent='写真を選ぶと、撮影場所と日時を読み取ります。';
+    $('photoTimeNote').textContent='写真の撮影日時を確認してください。';$('photoGpsPreviewStatus').textContent='';updateUploadChoice();
+  }
+  function updateUploadChoice(){
+    const use=!!uploadMetadata?.point&&$('usePhotoGps').checked;
+    $('photoUploadSubmit').disabled=uploadReading||uploadSaving||!uploadFile;
+    $('photoUploadSubmit').textContent=uploadReading?'写真の情報を読み取り中…':uploadSaving?'写真を保存中…':!uploadFile?'写真を選択してください':use?'この日時・場所で保存':'この日時で保存して地点を選ぶ';
+    $('photoUploadHelp').textContent=use?'撮影日時と地図の場所をご確認ください。保存すると、その日の地図にピンが立ちます。':'保存後に、地図をタップして撮影地点を指定してください。';
+    $('uploadLocationPreview').hidden=!use;
+    if(use&&uploadMap)requestAnimationFrame(()=>uploadMap?.resize());
+  }
+  function showUploadMap(point){
+    clearUploadMap();$('photoGpsPreviewStatus').textContent='';
+    if(!window.maplibregl){$('photoGpsPreviewStatus').textContent='確認用の地図を読み込めませんでした。座標を確認するか、チェックを外して地点を手動指定してください。';return;}
+    try{
+      uploadMap=new maplibregl.Map({container:'uploadLocationPreview',center:point,zoom:13,interactive:false,attributionControl:false,style:{version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,maxzoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}},layers:[{id:'photo-location',type:'raster',source:'osm'}]}});
+      uploadMap.addControl(new maplibregl.AttributionControl({compact:false}),'bottom-right');
+      new maplibregl.Marker({element:el('div','waypoint-marker','●')}).setLngLat(point).addTo(uploadMap);
+      uploadMap.on('error',()=>{$('photoGpsPreviewStatus').textContent='確認用の地図を読み込めませんでした。通信と表示座標をご確認ください。';});
+      requestAnimationFrame(()=>uploadMap?.resize());
+    }catch(_){$('photoGpsPreviewStatus').textContent='この端末では確認用の地図を表示できません。座標を確認するか、地点を手動指定してください。';}
+  }
+  async function readUploadPhoto(){
+    const ticket=++uploadTicket,file=$('photoFile').files[0];
+    uploadFile=null;uploadMetadata=null;clearUploadMap();$('photoGpsSection').hidden=true;$('photoTime').value='';$('photoTimeNote').textContent='';
+    if(!file){uploadReading=false;updateUploadChoice();return;}
+    if(file.size>25*1024*1024){uploadReading=false;$('photoMetadataStatus').textContent='写真は25MB以下で選択してください。';updateUploadChoice();return;}
+    uploadFile=file;uploadReading=true;$('photoTime').disabled=true;$('photoMetadataStatus').textContent='撮影場所と日時を読み取っています…';updateUploadChoice();
+    let metadata,error=false;
+    try{metadata=await PhotoMetadata.read(file);}catch(_){error=true;metadata={point:null,capturedAt:null};}
+    if(ticket!==uploadTicket)return;
+    uploadReading=false;uploadMetadata=metadata;$('photoTime').disabled=false;
+    if(metadata.capturedAt){$('photoTime').value=PhotoMetadata.japanInput(metadata.capturedAt);$('photoTimeNote').textContent=metadata.assumedTimezone?'写真に時差情報がないため、日本時間として読み取りました。日時が正しいか確認してください。':'写真の撮影日時を日本時間に変換しました。必要に応じて修正できます。';}
+    else $('photoTimeNote').textContent='撮影日時を読み取れませんでした。撮影した日時を入力してください。';
+    $('photoMetadataStatus').textContent=error?'写真の情報を読み取れませんでした。日時と撮影地点は手動で指定できます。':metadata.point?'写真に記録された撮影場所を読み取りました。':'写真に利用できる位置情報がありません。保存後に地点を指定できます。';
+    if(metadata.point){$('photoGpsSection').hidden=false;$('usePhotoGps').checked=true;$('photoGpsCoordinates').textContent=`緯度 ${metadata.point[1].toFixed(6)} / 経度 ${metadata.point[0].toFixed(6)}`;}
+    updateUploadChoice();if(metadata.point)showUploadMap(metadata.point);
+  }
   async function upload(event){
-    event.preventDefault();const button=event.submitter;button.disabled=true;
-    try{const file=$('photoFile').files[0],input=$('photoTime').value;if(!file||!input)return;const date=new Date(input+':00+09:00');if(!Number.isFinite(date.getTime()))throw new Error('撮影日時を確認してください。');
-      const photo={id:crypto.randomUUID(),capturedAt:date.toISOString(),point:null,title:'',blob:await resizePhoto(file),source:'upload',accuracy:null};await DB.addPhoto(photo);$('uploadDialog').close();state.date=C.day(photo.capturedAt);await refresh();setTab('photos');startPlace({type:'photo',id:photo.id});
-    }finally{button.disabled=false;}
+    event.preventDefault();if(uploadReading||uploadSaving)return;
+    const file=$('photoFile').files[0];if(!file||file!==uploadFile){toast('写真を選び直してください。');return;}
+    const capturedAt=PhotoMetadata.fromJapanInput($('photoTime').value);if(!capturedAt){toast('撮影日時を入力してください。');return;}
+    const originalMetadata=PhotoMetadata.original(uploadMetadata),point=$('usePhotoGps').checked&&uploadMetadata?.point?[...uploadMetadata.point]:null;
+    uploadSaving=true;$('photoFile').disabled=true;$('photoTime').disabled=true;updateUploadChoice();
+    try{
+      let blob;try{blob=await resizePhoto(file);}catch(_){throw new Error('この写真を表示できませんでした。JPEGまたはPNG形式の写真でお試しください。');}
+      const photo={id:crypto.randomUUID(),capturedAt,point,title:'',blob,source:'upload',accuracy:null,originalMetadata};
+      await DB.addPhoto(photo);$('uploadDialog').close();state.date=C.day(photo.capturedAt);await refresh();setTab('photos');
+      if(point){fitDay();toast('写真の撮影場所と日時で保存しました。');}else startPlace({type:'photo',id:photo.id});
+    }finally{uploadSaving=false;$('photoFile').disabled=false;$('photoTime').disabled=false;updateUploadChoice();}
   }
   // Controls are attached before startup so a map/CDN failure cannot hide saved photos.
   act('photosTab',()=>setTab('photos'));act('routeTab',()=>setTab('route'));act('settingsBtn',settings);
@@ -286,7 +336,10 @@
   act('cancelEdit',()=>{if(!confirm('編集中のルート案を破棄しますか？保存済みのルートは残ります。'))return;state.draft=null;state.history=[];endPlace();renderRoutePanel();renderMap();});
   $('colorMode').addEventListener('change',()=>preferences().catch(fail));$('zoomLimit').addEventListener('change',()=>preferences().catch(fail));
   act('exportBtn',backup);act('importBtn',()=>$('backupFile').click());$('backupFile').addEventListener('change',async()=>{try{await importBackup($('backupFile').files[0]);}catch(e){fail(e);}finally{$('backupFile').value='';}});
-  act('uploadBtn',()=>{if(state.draft){toast('ルートの編集を終了してから写真を追加してください。');return;}const now=new Date();const japan=new Date(now.getTime()+9*3600000).toISOString().slice(11,16);$('photoTime').value=state.date+'T'+japan;$('uploadDialog').showModal();});
+  act('uploadBtn',()=>{if(state.draft){toast('ルートの編集を終了してから写真を追加してください。');return;}resetUpload();$('uploadDialog').showModal();});
+  $('photoFile').addEventListener('change',()=>readUploadPhoto().catch(fail));
+  $('usePhotoGps').addEventListener('change',updateUploadChoice);
+  $('uploadDialog').addEventListener('close',()=>{uploadTicket++;clearUploadMap();});
   $('uploadForm').addEventListener('submit',e=>upload(e).catch(fail));
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stopLocation();else if(state.mapReady)startLocation(false);});
   window.addEventListener('beforeunload',e=>{if(state.draft){e.preventDefault();e.returnValue='';}});
