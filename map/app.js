@@ -14,6 +14,7 @@
   function fail(e){console.error(e);toast(e?.message || '処理に失敗しました。もう一度お試しください。');}
   function hint(message){$('mapHint').textContent=message;$('mapHint').classList.toggle('placing',!!state.placing);}
   function photoSignature(){return JSON.stringify(C.dailyPhotos(state.photos,state.date).filter(p=>C.validPoint(p.point)).map(p=>[p.id,p.capturedAt,p.point]));}
+  function photoNumber(id){const p=state.photos.find(p=>p.id===id);return p?C.dailyPhotos(state.photos,C.day(p.capturedAt)).findIndex(p=>p.id===id)+1:0;}
   function savedRoute(){return state.routes.find(r=>r.date===state.date);}
   function clone(x){return JSON.parse(JSON.stringify(x));}
   function action(text,cls,fn){const b=el('button',cls,text);b.type='button';b.addEventListener('click',()=>Promise.resolve().then(fn).catch(fail));return b;}
@@ -32,8 +33,8 @@
     $('photoList').replaceChildren();
     if(!daily.length){const box=el('div','empty');const icon=el('div','empty-icon','✧');box.append(icon,el('h3','','この日の思い出を、ここに。'),el('p','','ARカメラで撮影したら「地図で記録する」。写真の場所が、旅のしるしになります。'));$('photoList').append(box);}
     daily.forEach((p,i)=>{
-      const b=action('','photo-card',()=>openPhoto(p.id)),img=el('img');img.src=photoUrl(p.blob);img.alt=p.title || '旅の写真';img.loading='lazy';
-      const copy=el('div','copy'),t=el('time','',time(p.capturedAt));t.dateTime=p.capturedAt;
+      const b=action('','photo-card',()=>openPhoto(p.id)),img=el('img');b.dataset.photoId=p.id;b.dataset.photoNumber=i+1;img.src=photoUrl(p.blob);img.alt=p.title || '旅の写真';img.loading='lazy';
+      const copy=el('div','copy'),t=el('time','',`写真 ${i+1} · ${time(p.capturedAt)}`);t.dateTime=p.capturedAt;
       copy.append(t,el('h3','',p.title || '旅の写真 '+(i+1)),el('p','',p.point?(p.accuracy>100?'GPSの誤差が大きい地点':'地図に記録済み'):'撮影地点を指定してください'));
       b.append(img,copy,el('span','arrow','›'));$('photoList').append(b);
     });
@@ -65,8 +66,10 @@
   function renderMap(){
     if(!state.mapReady)return;
     state.markers.forEach(m=>m.remove());state.markers=[];
-    C.dailyPhotos(state.photos,state.date).filter(p=>p.point).forEach((p,i)=>{
-      const b=el('button','photo-pin');b.style.setProperty('--pin',p.color||C.colors[0]);b.setAttribute('aria-label',stamp(p.capturedAt)+' '+(p.title||'旅の写真'));
+    C.dailyPhotos(state.photos,state.date).forEach((p,i)=>{
+      // Keep the original daily photo index, including photos awaiting a location.
+      if(!C.validPoint(p.point))return;
+      const b=el('button','photo-pin');b.dataset.photoId=p.id;b.dataset.photoNumber=i+1;b.style.setProperty('--pin',p.color||C.colors[0]);b.setAttribute('aria-label',`写真 ${i+1} · ${stamp(p.capturedAt)} ${p.title||'旅の写真'}`);
       b.append(el('span','pin-shape'),el('span','pin-number',String(i+1)));
       b.addEventListener('click',e=>{e.stopPropagation();if(!state.placing)openPhoto(p.id).catch(fail);});
       state.markers.push(new maplibregl.Marker({element:b,anchor:'bottom'}).setLngLat(p.point).addTo(state.map));
@@ -75,7 +78,7 @@
     state.map.getSource('journey')?.setData({type:'FeatureCollection',features:(r?.segments||[]).map(s=>({type:'Feature',properties:{kind:s.kind},geometry:{type:'LineString',coordinates:s.coordinates}}))});
     state.routeMarkers.forEach(m=>m.remove());state.routeMarkers=[];
     if(state.draft)state.draft.points.forEach((p,i)=>{
-      const n=el('div','waypoint-marker',String(i+1));n.title=p.photoId?'撮影地点（写真の詳細から修正できます）':'ドラッグして経由地を動かす';
+      const n=el('div','waypoint-marker',p.photoId?String(photoNumber(p.photoId)||'写'):'+');n.title=p.photoId?`写真 ${photoNumber(p.photoId)} の撮影地点（写真の詳細から修正できます）`:'ドラッグして経由地を動かす';
       const m=new maplibregl.Marker({element:n,draggable:!p.photoId && !state.busy}).setLngLat(p.point).addTo(state.map);
       m.on('dragstart',()=>pushHistory());m.on('dragend',()=>{p.point=m.getLngLat().toArray();resetDraft();});state.routeMarkers.push(m);
     });
@@ -125,7 +128,8 @@
   async function openPhoto(id){
     const p=state.photos.find(x=>x.id===id);if(!p)return;state.selected=id;
     if(largeUrl)URL.revokeObjectURL(largeUrl);largeUrl=URL.createObjectURL(p.blob);$('largePhoto').src=largeUrl;
-    $('photoDate').textContent=stamp(p.capturedAt);$('photoTitle').textContent=p.title||'旅の写真';$('photoMemo').value=p.title||'';
+    $('placePhoto').dataset.photoId=p.id;
+    $('photoDate').textContent=`写真 ${photoNumber(p.id)} · ${stamp(p.capturedAt)}`;$('photoTitle').textContent=p.title||'旅の写真';$('photoMemo').value=p.title||'';
     $('photoLocation').textContent=p.point?`${p.point[1].toFixed(5)}, ${p.point[0].toFixed(5)}${p.accuracy?' · GPS精度の目安 ±'+Math.round(p.accuracy)+'m':p.originalMetadata?.point?.every((v,i)=>v===p.point[i])?' · 写真の位置情報':' · 手動指定'}`:'位置情報がありません。地図上で撮影地点を指定できます。';
     $('photoDialog').showModal();
   }
@@ -157,7 +161,7 @@
     const r=state.draft;if(!r)return;
     $('routeReviewed').checked=false;$('routeTag').textContent='確認前のルート';$('waypoints').replaceChildren();
     r.points.forEach((p,i)=>{
-      const li=el('li');li.dataset.number=i+1;const row=el('div','waypoint-row');row.append(el('span','waypoint-label',p.label));
+      const li=el('li');li.dataset.number=i+1;const row=el('div','waypoint-row');row.append(el('span','waypoint-label',p.photoId?`写真 ${photoNumber(p.photoId)||'（削除済み）'} · ${p.label}`:p.label));
       const remove=action('×','waypoint-remove',()=>{pushHistory();r.points.splice(i,1);resetDraft();});remove.setAttribute('aria-label',p.label+'をルートから外す');remove.disabled=state.busy || r.points.length<=2;row.append(remove);li.append(row);
       const tools=el('div','waypoint-tools');
       if(i<r.points.length-1){const select=el('select');select.setAttribute('aria-label','次の地点への移動手段');Object.entries(modes).forEach(([value,label])=>{const opt=el('option','',label);opt.value=value;select.append(opt);});select.value=p.mode;select.disabled=state.busy;
@@ -176,17 +180,19 @@
   }
   function startPlace(value){
     if(!state.mapReady){toast('地図を読み込んでからお試しください。');return;}
-    state.placing=value;state.follow=false;$('journal').classList.add('collapsed');$('collapse').setAttribute('aria-expanded','false');
-    hint('地図をタップして'+(value.type==='photo'?'撮影地点':'経由地')+'を指定 · ここを押すと中止');
+    if(value.type==='photo'&&!state.photos.some(p=>p.id===value.id)){toast('指定する写真が見つかりません。写真を選び直してください。');return;}
+    state.placing={...value};state.follow=false;$('journal').classList.add('collapsed');$('collapse').setAttribute('aria-expanded','false');
+    hint('地図をタップして'+(value.type==='photo'?`写真 ${photoNumber(value.id)} の撮影地点`:'経由地')+'を指定 · ここを押すと中止');
   }
   function endPlace(){state.placing=null;$('journal').classList.remove('collapsed');$('collapse').setAttribute('aria-expanded','true');hint('１本指で移動 · ２本指で拡大・縮小・回転');}
   async function placeAt(point){
-    if(!C.validPoint(point))return;const place=state.placing;if(!place)return;
+    if(!C.validPoint(point))return;const place=state.placing;if(!place||place.saving)return;
     if(place.type==='photo'){
       const p=state.photos.find(p=>p.id===place.id);if(!p){endPlace();return;}
       const count=state.photos.filter(p=>p.point).length;
       const changed={...p,point,accuracy:null,positionAt:null};if(!p.point)changed.color=C.pinColor(state.prefs.colorMode,count+1,C.totalDistance(state.routes));
-      await DB.put('photos',changed);endPlace();await refresh();toast('撮影地点を保存しました。');
+      const number=photoNumber(place.id);place.saving=true;
+      try{await DB.put('photos',changed);if(state.placing===place)endPlace();await refresh();toast(`写真 ${number} の撮影地点を保存しました。`);}finally{place.saving=false;}
     }else if(state.draft){pushHistory();state.draft.points.splice(place.after+1,0,{id:crypto.randomUUID(),point,label:'寄り道・経由地',mode:state.draft.points[place.after]?.mode||'foot'});endPlace();resetDraft();toast('経由地を追加しました。丸い番号をドラッグすると位置を調整できます。');}
   }
   async function routeSegment(a,b,signal){
@@ -328,7 +334,7 @@
   $('date').addEventListener('change',()=>changeDate($('date').value).catch(fail));act('previousDate',()=>relativeDate(-1));act('nextDate',()=>relativeDate(1));
   document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
   act('saveMemo',async()=>{const p=state.photos.find(p=>p.id===state.selected);if(!p)return;await DB.put('photos',{...p,title:$('photoMemo').value.trim()});$('photoDialog').close();await refresh();});
-  act('placePhoto',()=>{$('photoDialog').close();startPlace({type:'photo',id:state.selected});});
+  act('placePhoto',()=>{const id=$('placePhoto').dataset.photoId;$('photoDialog').close();startPlace({type:'photo',id});});
   act('downloadPhoto',async()=>{const p=state.photos.find(p=>p.id===state.selected);if(!p)return;const file=new File([p.blob],`kyoto-${C.day(p.capturedAt)}.jpg`,{type:p.blob.type});if(navigator.canShare?.({files:[file]})){try{await navigator.share({files:[file]});return;}catch(e){if(e.name==='AbortError')return;}}download(p.blob,file.name);});
   act('deletePhoto',async()=>{if(!confirm('この写真を地図アプリから削除しますか？保存済みのルートは残ります。'))return;await DB.remove('photos',state.selected);$('photoDialog').close();await refresh();toast('写真を削除しました。');});
   act('addWaypoint',()=>startPlace({type:'waypoint',after:state.draft.points.length-2}));act('calculate',calculate);act('saveRoute',saveRoute);
