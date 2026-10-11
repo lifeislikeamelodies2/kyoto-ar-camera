@@ -190,9 +190,9 @@
     if(place.type==='photo'){
       const p=state.photos.find(p=>p.id===place.id);if(!p){endPlace();return;}
       const count=state.photos.filter(p=>p.point).length;
-      const changed={...p,point,accuracy:null,positionAt:null};if(!p.point)changed.color=C.pinColor(state.prefs.colorMode,count+1,C.totalDistance(state.routes));
+      const changed={point,accuracy:null,positionAt:null};if(!p.point)changed.color=C.pinColor(state.prefs.colorMode,count+1,C.totalDistance(state.routes));
       const number=photoNumber(place.id);place.saving=true;
-      try{await DB.put('photos',changed);if(state.placing===place)endPlace();await refresh();toast(`写真 ${number} の撮影地点を保存しました。`);}finally{place.saving=false;}
+      try{await DB.updatePhotoDetails(p.id,changed);if(state.placing===place)endPlace();await refresh();toast(`写真 ${number} の撮影地点を保存しました。`);}finally{place.saving=false;}
     }else if(state.draft){pushHistory();state.draft.points.splice(place.after+1,0,{id:crypto.randomUUID(),point,label:'寄り道・経由地',mode:state.draft.points[place.after]?.mode||'foot'});endPlace();resetDraft();toast('経由地を追加しました。丸い番号をドラッグすると位置を調整できます。');}
   }
   async function routeSegment(a,b,signal){
@@ -334,7 +334,16 @@
   act('fit',()=>fitDay());act('mapHint',()=>{if(state.placing)endPlace();});
   $('date').addEventListener('change',()=>changeDate($('date').value).catch(fail));act('previousDate',()=>relativeDate(-1));act('nextDate',()=>relativeDate(1));
   document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
-  act('saveMemo',async()=>{const p=state.photos.find(p=>p.id===state.selected);if(!p)return;await DB.put('photos',{...p,title:$('photoMemo').value.trim()});$('photoDialog').close();await refresh();});
+  act('saveMemo',async()=>{
+    const p=state.photos.find(p=>p.id===state.selected);if(!p)return;
+    const title=$('photoMemo').value.trim();$('saveMemo').disabled=true;
+    try{
+      await DB.updatePhotoDetails(p.id,{title});p.title=title;
+      // Keep existing image URLs and elements alive during a text-only edit.
+      $('photoList').querySelectorAll('.photo-card').forEach(card=>{if(card.dataset.photoId!==p.id)return;card.querySelector('h3').textContent=title||'旅の写真 '+photoNumber(p.id);card.querySelector('img').alt=title||'旅の写真';});
+      $('photoTitle').textContent=title||'旅の写真';renderMap();$('photoDialog').close();toast('メモを保存しました。');
+    }finally{$('saveMemo').disabled=false;}
+  });
   act('placePhoto',()=>{const id=$('placePhoto').dataset.photoId;$('photoDialog').close();startPlace({type:'photo',id});});
   act('downloadPhoto',async()=>{const p=state.photos.find(p=>p.id===state.selected);if(!p)return;const file=new File([p.blob],`kyoto-${C.day(p.capturedAt)}.jpg`,{type:p.blob.type});if(navigator.canShare?.({files:[file]})){try{await navigator.share({files:[file]});return;}catch(e){if(e.name==='AbortError')return;}}download(p.blob,file.name);});
   act('deletePhoto',async()=>{if(!confirm('この写真を地図アプリから削除しますか？保存済みのルートは残ります。'))return;await DB.remove('photos',state.selected);$('photoDialog').close();await refresh();toast('写真を削除しました。');});
