@@ -326,6 +326,7 @@
     }finally{uploadSaving=false;$('photoFile').disabled=false;$('photoTime').disabled=false;updateUploadChoice();}
   }
   // Controls are attached before startup so a map/CDN failure cannot hide saved photos.
+  act('dayReportBtn',()=>{if(state.draft){toast('ルートを保存するか、編集を終了してから画像を作成してください。');return;}DayReport.open({date:state.date,photos:C.dailyPhotos(state.photos,state.date),route:savedRoute()});});
   act('photosTab',()=>setTab('photos'));act('routeTab',()=>setTab('route'));act('settingsBtn',settings);
   act('collapse',()=>{const c=$('journal').classList.toggle('collapsed');$('collapse').setAttribute('aria-expanded',!c);$('collapse').setAttribute('aria-label',c?'記録パネルを開く':'記録パネルを折りたたむ');});
   act('north',()=>{state.map?.easeTo({bearing:0,pitch:0,duration:500});hint('真北を上に戻しました');});
