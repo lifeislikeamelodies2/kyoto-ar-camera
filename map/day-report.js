@@ -8,11 +8,11 @@
   function clearResult(){if(resultUrl)URL.revokeObjectURL(resultUrl);resultUrl=null;blob=null;$('reportImage').removeAttribute('src');$('reportResult').hidden=true;}
   function clear(){session++;abort?.abort();abort=null;map?.remove();map=null;markers=[];thumbUrls.forEach(u=>URL.revokeObjectURL(u));thumbUrls=[];clearResult();busy=false;}
   function configure(){
-    clearResult();$('reportChoices').hidden=mode()!=='selected';$('reportSelectionCount').hidden=mode()!=='selected';$('reportSelectionCount').textContent=`${selected.size} / 5 か所`;
-    $('reportChoices').querySelectorAll('input').forEach(input=>{input.disabled=busy||(!input.checked&&selected.size>=5);});
+    clearResult();$('reportChoices').hidden=mode()!=='selected';$('reportSelectionCount').hidden=mode()!=='selected';$('reportSelectionCount').textContent=`${selected.size} 枚を選択中（上限なし）`;
+    $('reportChoices').querySelectorAll('input').forEach(input=>{input.disabled=busy;});
     $('reportAllMode').disabled=busy;$('reportSelectedMode').disabled=busy||!data.photos.length;
     $('reportCreate').disabled=busy||(!data.photos.length&&!data.route)||(mode()==='selected'&&!selected.size);
-    status(!data.photos.length&&!data.route?'この日の記録はありません。':mode()==='selected'&&!selected.size?'掲載するスポットを１〜５か所選んでください。':'地図と距離は１日全体、写真は選んだ範囲を掲載します。');
+    status(!data.photos.length&&!data.route?'この日の記録はありません。':mode()==='selected'&&!selected.size?'掲載する写真を１枚以上、自由に選んでください。':'地図と距離は１日全体、写真は選んだ範囲を掲載します。');
     updatePins();
   }
   function updatePins(){
@@ -81,7 +81,7 @@
         createCanvas:(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;},decodeImage,releaseImage:img=>img.close?.(),cancelled:()=>token!==session,
         onProgress:(done,total)=>{if(token===session)status(`写真を配置しています… ${done} / ${total}枚`);}
       });
-      const result=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('画像を作成できませんでした。写真を５か所以内で選び直してお試しください。')),'image/png'));
+      const result=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('画像を作成できませんでした。写真の枚数を減らして再度お試しください。')),'image/png'));
       if(token!==session)return;
       blob=result;resultUrl=URL.createObjectURL(result);$('reportImage').src=resultUrl;$('reportResult').hidden=false;
       status(`画像を作成しました（${canvas.width} × ${canvas.height}）。「画像を保存・共有」から保存できます。`);
@@ -89,7 +89,7 @@
     }catch(e){if(token===session)status(e.name==='SecurityError'?'地図画像を取得できませんでした。ページを再読み込みしてお試しください。':e.message||'画像を作成できませんでした。');}
     finally{
       if(canvas){canvas.width=1;canvas.height=1;}if(snapshot){snapshot.width=1;snapshot.height=1;}
-      if(token===session){busy=false;$('reportAllMode').disabled=false;$('reportSelectedMode').disabled=!data.photos.length;$('reportCreate').disabled=false;$('reportChoices').querySelectorAll('input').forEach(input=>input.disabled=!input.checked&&selected.size>=5);}
+      if(token===session){busy=false;$('reportAllMode').disabled=false;$('reportSelectedMode').disabled=!data.photos.length;$('reportCreate').disabled=false;$('reportChoices').querySelectorAll('input').forEach(input=>input.disabled=false);}
     }
   }
   async function save(){
@@ -108,7 +108,7 @@
       const label=document.createElement('label');label.className='report-choice';const input=document.createElement('input');input.type='checkbox';input.value=p.id;input.setAttribute('aria-label',`写真 ${i+1} を掲載`);
       const img=document.createElement('img'),url=URL.createObjectURL(p.blob);thumbUrls.push(url);img.src=url;img.alt='';img.loading='lazy';
       const text=document.createElement('span');text.textContent=`写真 ${i+1} · ${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'}).format(new Date(p.capturedAt))}${p.title?' · '+p.title:''}${p.point?'':'（地点未設定）'}`;
-      input.addEventListener('change',()=>{if(input.checked){if(selected.size>=5){input.checked=false;return;}selected.add(p.id);}else selected.delete(p.id);configure();});label.append(input,img,text);$('reportChoices').append(label);
+      input.addEventListener('change',()=>{if(input.checked){selected.add(p.id);}else selected.delete(p.id);configure();});label.append(input,img,text);$('reportChoices').append(label);
     });
     $('reportDialog').showModal();configure();makeMap(session);
   }

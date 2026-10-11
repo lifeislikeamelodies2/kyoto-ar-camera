@@ -5,10 +5,12 @@ const photos=Array.from({length:18},(_,i)=>({id:'p'+(i+1),point:i===2?null:[134,
 test('all mode includes every photo, including photos without a location',()=>{
   const result=R.choose(photos,'all');assert.equal(result.length,18);assert.equal(result[2].point,null);assert.equal(result[14].number,15);
 });
-test('selected mode keeps daily order and original numbers, up to five distinct photos',()=>{
+test('selected mode keeps daily order and original numbers, without a selection limit',()=>{
   const result=R.choose(photos,'selected',['p15','p3','p18','p1','p5','p5']);
   assert.deepEqual(result.map(p=>p.number),[1,3,5,15,18]);
-  assert.throws(()=>R.choose(photos,'selected',[]));assert.throws(()=>R.choose(photos,'selected',['p1','p2','p3','p4','p5','p6']));
+  assert.throws(()=>R.choose(photos,'selected',[]));assert.equal(R.choose(photos,'selected',['p1','p2','p3','p4','p5','p6']).length,6);
+  assert.equal(R.choose(photos,'selected',photos.map(p=>p.id)).length,18);
+  const many=Array.from({length:500},(_,i)=>({id:'many'+i}));assert.equal(R.choose(many,'selected',many.map(p=>p.id)).length,500);
 });
 test('long all-photo images fit mobile canvas bounds without dropping cards',()=>{
   for(const count of [0,1,5,18,100,500,2000]){

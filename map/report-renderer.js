@@ -4,7 +4,7 @@
     if(mode==='all')return photos.map((p,i)=>({...p,number:i+1}));
     const wanted=new Set(ids);
     const selected=photos.map((p,i)=>({...p,number:i+1})).filter(p=>wanted.has(p.id));
-    if(selected.length<1||selected.length>5)throw new Error('スポットを１〜５か所選んでください。');
+    if(selected.length<1)throw new Error('掲載する写真を１枚以上選んでください。');
     return selected;
   }
   function layout(count){

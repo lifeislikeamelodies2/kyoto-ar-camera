@@ -14,8 +14,8 @@
   <script defer src="store.js?v=20261011-memo-fix"></script>
   <script defer src="vendor/exifr-7.1.3.js"></script>
   <script defer src="photo-metadata.js?v=20261011-exif"></script>
-  <script defer src="report-renderer.js?v=20261011-day-report"></script>
-  <script defer src="day-report.js?v=20261011-day-report"></script>
+  <script defer src="report-renderer.js?v=20261011-unlimited"></script>
+  <script defer src="day-report.js?v=20261011-unlimited"></script>
   <script defer src="app.js?v=20261011-memo-fix"></script>
 </head>
 <body>
@@ -82,7 +82,7 @@
   </form></dialog>
   <dialog id="reportDialog" class="modal report-modal"><button id="reportClose" class="close" aria-label="閉じる">×</button><div class="modal-body">
     <p class="eyebrow">A DAY TO REMEMBER</p><h2>１日の記録を画像に</h2><p id="reportDate" class="small"></p>
-    <fieldset class="report-modes"><legend>掲載するスポット</legend><label class="check-row"><input type="radio" name="reportMode" id="reportAllMode" checked>すべての写真</label><label class="check-row"><input type="radio" name="reportMode" id="reportSelectedMode">選んだスポット（最大５か所）</label></fieldset>
+    <fieldset class="report-modes"><legend>掲載するスポット</legend><label class="check-row"><input type="radio" name="reportMode" id="reportAllMode" checked>すべての写真</label><label class="check-row"><input type="radio" name="reportMode" id="reportSelectedMode">任意選択（上限なし）</label></fieldset>
     <p id="reportSelectionCount" class="fine"></p><div id="reportChoices" class="report-choices" hidden></div>
     <div id="reportMap" aria-label="記録画像に掲載する１日の地図"></div><p id="reportMapNote" class="fine"></p>
     <p class="fine">１つの写真ピンを１スポットとして選べます。地点未設定の写真も掲載できます。写真が多い場合は、すべてを含む縦長の画像に縮小してまとめます。</p>
