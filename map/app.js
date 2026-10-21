@@ -9,7 +9,7 @@
   const time=t=>new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'}).format(new Date(t));
   const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
   const act=(id,fn)=>$(id).addEventListener('click',()=>Promise.resolve().then(fn).catch(fail));
-  let toastTimer,largeUrl,locationMarker,locationElement,lastRouteRequest=0;
+  let toastTimer,largeUrl,locationMarker,locationElement,lastRouteRequest=0,photoPreviews,photoTicket=0;
   function toast(message){$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
   function fail(e){console.error(e);toast(e?.message || '処理に失敗しました。もう一度お試しください。');}
   function hint(message){$('mapHint').textContent=message;$('mapHint').classList.toggle('placing',!!state.placing);}
@@ -18,11 +18,10 @@
   function savedRoute(){return state.routes.find(r=>r.date===state.date);}
   function clone(x){return JSON.parse(JSON.stringify(x));}
   function action(text,cls,fn){const b=el('button',cls,text);b.type='button';b.addEventListener('click',()=>Promise.resolve().then(fn).catch(fail));return b;}
-  function photoUrl(blob){const u=URL.createObjectURL(blob);state.urls.push(u);return u;}
   function setTab(tab){$('photosTab').setAttribute('aria-selected',tab==='photos');$('routeTab').setAttribute('aria-selected',tab==='route');$('photosPane').hidden=tab!=='photos';$('routePane').hidden=tab!=='route';$('journal').classList.remove('collapsed');$('collapse').setAttribute('aria-expanded','true');}
-  async function refresh(){[state.photos,state.routes]=await Promise.all([DB.all('photos'),DB.all('routes')]);render();}
+  async function refresh(){[state.photos,state.routes]=await Promise.all([DB.listPhotos(),DB.all('routes')]);render();}
   function render(){
-    state.urls.forEach(u=>URL.revokeObjectURL(u));state.urls=[];
+    photoPreviews?.dispose();photoPreviews=PhotoImages.previews(null);
     const daily=C.dailyPhotos(state.photos,state.date),total=C.totalDistance(state.routes),pins=state.photos.filter(p=>C.validPoint(p.point)).length;
     $('date').value=state.date;
     $('dateCaption').textContent=state.date.replaceAll('-',' . ');
@@ -33,7 +32,7 @@
     $('photoList').replaceChildren();
     if(!daily.length){const box=el('div','empty');const icon=el('div','empty-icon','✧');box.append(icon,el('h3','','この日の思い出を、ここに。'),el('p','','ARカメラで撮影したら「地図で記録する」。写真の場所が、旅のしるしになります。'));$('photoList').append(box);}
     daily.forEach((p,i)=>{
-      const b=action('','photo-card',()=>openPhoto(p.id)),img=el('img');b.dataset.photoId=p.id;b.dataset.photoNumber=i+1;img.src=photoUrl(p.blob);img.alt=p.title || '旅の写真';img.loading='lazy';
+      const b=action('','photo-card',()=>openPhoto(p.id)),img=el('img');b.dataset.photoId=p.id;b.dataset.photoNumber=i+1;img.alt=p.title || '旅の写真';photoPreviews.observe(img,p.id);
       const copy=el('div','copy'),t=el('time','',`写真 ${i+1} · ${time(p.capturedAt)}`);t.dateTime=p.capturedAt;
       copy.append(t,el('h3','',p.title || '旅の写真 '+(i+1)),el('p','',p.point?(p.accuracy>100?'GPSの誤差が大きい地点':'地図に記録済み'):'撮影地点を指定してください'));
       b.append(img,copy,el('span','arrow','›'));$('photoList').append(b);
@@ -127,11 +126,14 @@
   }
   async function openPhoto(id){
     const p=state.photos.find(x=>x.id===id);if(!p)return;state.selected=id;
-    if(largeUrl)URL.revokeObjectURL(largeUrl);largeUrl=URL.createObjectURL(p.blob);$('largePhoto').src=largeUrl;
+    const ticket=++photoTicket;
+    if(largeUrl)URL.revokeObjectURL(largeUrl);largeUrl=null;$('largePhoto').removeAttribute('src');$('largePhoto').alt='写真を読み込んでいます…';
     $('placePhoto').dataset.photoId=p.id;
     $('photoDate').textContent=`写真 ${photoNumber(p.id)} · ${stamp(p.capturedAt)}`;$('photoTitle').textContent=p.title||'旅の写真';$('photoMemo').value=p.title||'';
     $('photoLocation').textContent=p.point?`${p.point[1].toFixed(5)}, ${p.point[0].toFixed(5)}${p.accuracy?' · GPS精度の目安 ±'+Math.round(p.accuracy)+'m':p.originalMetadata?.point?.every((v,i)=>v===p.point[i])?' · 写真の位置情報':' · 手動指定'}`:'位置情報がありません。地図上で撮影地点を指定できます。';
     $('photoDialog').showModal();
+    try{const blob=await DB.getPhotoBlob(id);if(ticket!==photoTicket||!$('photoDialog').open)return;largeUrl=URL.createObjectURL(blob);$('largePhoto').src=largeUrl;$('largePhoto').alt=p.title||'旅の写真';}
+    catch(e){if(ticket===photoTicket){$('largePhoto').alt='写真を読み込めませんでした。';throw e;}}
   }
   function renderRoutePanel(){
     $('routeEditor').hidden=!state.draft;$('routeSummary').replaceChildren();
@@ -243,7 +245,7 @@
   const dataUrl=blob=>new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(blob);});
   async function backup(){
     $('exportBtn').disabled=true;
-    try{toast('写真を含めてバックアップを準備しています。');const [photos,routes]=await Promise.all([DB.all('photos'),DB.all('routes')]);const converted=[];for(const p of photos){const {blob,...meta}=p;converted.push({...meta,image:await dataUrl(blob)});}
+    try{toast('写真を含めてバックアップを準備しています。');const [photos,routes]=await Promise.all([DB.listPhotos(),DB.all('routes')]);const converted=[];for(const p of photos){const {imageRevision,...meta}=p;converted.push({...meta,image:await dataUrl(await DB.getPhotoBlob(p.id))});}
       const blob=new Blob([JSON.stringify({format:'kyoto-travel-journal',version:1,exportedAt:new Date().toISOString(),photos:converted,routes,preferences:state.prefs})],{type:'application/json'});download(blob,'kyoto-travel-'+C.day(new Date())+'.json');toast('バックアップを書き出しました。ダウンロードしたファイルを保管してください。');
     }finally{$('exportBtn').disabled=false;}
   }
@@ -345,7 +347,8 @@
     }finally{$('saveMemo').disabled=false;}
   });
   act('placePhoto',()=>{const id=$('placePhoto').dataset.photoId;$('photoDialog').close();startPlace({type:'photo',id});});
-  act('downloadPhoto',async()=>{const p=state.photos.find(p=>p.id===state.selected);if(!p)return;const file=new File([p.blob],`kyoto-${C.day(p.capturedAt)}.jpg`,{type:p.blob.type});if(navigator.canShare?.({files:[file]})){try{await navigator.share({files:[file]});return;}catch(e){if(e.name==='AbortError')return;}}download(p.blob,file.name);});
+  act('downloadPhoto',async()=>{const p=state.photos.find(p=>p.id===state.selected);if(!p)return;const blob=await DB.getPhotoBlob(p.id),file=new File([blob],`kyoto-${C.day(p.capturedAt)}.jpg`,{type:blob.type});if(navigator.canShare?.({files:[file]})){try{await navigator.share({files:[file]});return;}catch(e){if(e.name==='AbortError')return;}}download(blob,file.name);});
+  $('photoDialog').addEventListener('close',()=>{photoTicket++;if(largeUrl)URL.revokeObjectURL(largeUrl);largeUrl=null;$('largePhoto').removeAttribute('src');});
   act('deletePhoto',async()=>{if(!confirm('この写真を地図アプリから削除しますか？保存済みのルートは残ります。'))return;await DB.remove('photos',state.selected);$('photoDialog').close();await refresh();toast('写真を削除しました。');});
   act('addWaypoint',()=>startPlace({type:'waypoint',after:state.draft.points.length-2}));act('calculate',calculate);act('saveRoute',saveRoute);
   act('undoRoute',()=>{if(!state.history.length)return;state.draft=state.history.pop();renderEditor();renderMap();});
@@ -360,7 +363,7 @@
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stopLocation();else if(state.mapReady)startLocation(false);});
   window.addEventListener('beforeunload',e=>{if(state.draft){e.preventDefault();e.returnValue='';}});
   (async()=>{
-    try{await DB.open();state.prefs={...state.prefs,...await DB.get('settings','preferences')};[state.photos,state.routes]=await Promise.all([DB.all('photos'),DB.all('routes')]);const id=new URL(location.href).searchParams.get('photo'),p=state.photos.find(p=>p.id===id);
+    try{await DB.open();state.prefs={...state.prefs,...await DB.get('settings','preferences')};[state.photos,state.routes]=await Promise.all([DB.listPhotos(),DB.all('routes')]);const id=new URL(location.href).searchParams.get('photo'),p=state.photos.find(p=>p.id===id);
       if(p)state.date=C.day(p.capturedAt);else if(state.photos.length)state.date=state.photos.map(p=>C.day(p.capturedAt)).sort().at(-1);
       // Preserve photo selection locally, never put image/coordinates in the URL.
       if(id)history.replaceState(null,'',location.pathname);

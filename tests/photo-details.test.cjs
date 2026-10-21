@@ -15,7 +15,10 @@ function setup(indexedDB=new IDBFactory()){
   let sequence=0;const active=new Set();
   w.URL.createObjectURL=()=>{const url='blob:test-'+(++sequence);active.add(url);return url;};
   w.URL.revokeObjectURL=url=>active.delete(url);
-  for(const p of ['core.js','store.js'])w.eval(fs.readFileSync(path.join(base,p),'utf8'));
+  w.createImageBitmap=async()=>({width:1800,height:1200,close(){}});
+  w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},drawImage(){}});
+  w.HTMLCanvasElement.prototype.toBlob=function(cb){cb(new Blob(['thumbnail'],{type:'image/jpeg'}));};
+  for(const p of ['core.js','store.js','photo-images.js'])w.eval(fs.readFileSync(path.join(base,p),'utf8'));
   return {dom,w,db:w.TravelStore,active};
 }
 const photo=id=>({id,title:'',capturedAt:'2026-10-11T01:00:00Z',point:null,blob:new Blob(['original image bytes'],{type:'image/jpeg'}),originalMetadata:{point:null}});
@@ -24,6 +27,7 @@ test('memo saves preserve image nodes and bytes, and survive reopening the datab
   const indexedDB=new IDBFactory(),a=setup(indexedDB);await a.db.addPhoto(photo('one'));await a.db.addPhoto(photo('two'));
   a.w.eval(fs.readFileSync(path.join(base,'app.js'),'utf8'));
   await settle(()=>a.w.document.querySelectorAll('.photo-card').length===2);
+  await settle(()=>a.w.document.querySelector('.photo-card img').hasAttribute('src'));
   const d=a.w.document,card=d.querySelector('.photo-card'),img=card.querySelector('img'),url=img.src;
   const originalPut=IDBObjectStore.prototype.put;let photoWrites=0;
   IDBObjectStore.prototype.put=function(...args){if(this.name==='photos')photoWrites++;return originalPut.apply(this,args);};

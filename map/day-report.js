@@ -1,12 +1,12 @@
 (() => {
   'use strict';
   const $=id=>document.getElementById(id),C=TravelCore,R=TravelReportRenderer;
-  let data=null,selected=new Set(),map=null,markers=[],mapError=false,blob=null,resultUrl=null,thumbUrls=[],busy=false,session=0,abort=null;
+  let data=null,selected=new Set(),map=null,markers=[],mapError=false,blob=null,resultUrl=null,photoPreviews,busy=false,session=0,abort=null;
   const mode=()=>$('reportSelectedMode').checked?'selected':'all';
   function chosen(){return R.choose(data.photos,mode(),[...selected]);}
   function status(text){$('reportStatus').textContent=text;}
   function clearResult(){if(resultUrl)URL.revokeObjectURL(resultUrl);resultUrl=null;blob=null;$('reportImage').removeAttribute('src');$('reportResult').hidden=true;}
-  function clear(){session++;abort?.abort();abort=null;map?.remove();map=null;markers=[];thumbUrls.forEach(u=>URL.revokeObjectURL(u));thumbUrls=[];clearResult();busy=false;}
+  function clear(){session++;abort?.abort();abort=null;map?.remove();map=null;markers=[];photoPreviews?.dispose();photoPreviews=null;clearResult();busy=false;}
   function configure(){
     clearResult();$('reportChoices').hidden=mode()!=='selected';$('reportSelectionCount').hidden=mode()!=='selected';$('reportSelectionCount').textContent=`${selected.size} 枚を選択中（上限なし）`;
     $('reportChoices').querySelectorAll('input').forEach(input=>{input.disabled=busy;});
@@ -59,11 +59,6 @@
       current.on('idle',check);signal.addEventListener('abort',cancel,{once:true});if(signal.aborted)cancel();else check();
     });
   }
-  async function decodeImage(source){
-    if(typeof createImageBitmap==='function'){try{return await createImageBitmap(source);}catch(_){}}
-    const url=URL.createObjectURL(source),img=new Image();
-    try{img.src=url;await img.decode();return img;}finally{URL.revokeObjectURL(url);}
-  }
   async function create(){
     if(busy||!data)return;
     const token=session;let canvas=null,snapshot=null;
@@ -78,7 +73,7 @@
       if(document.fonts)await Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,2500))]);
       if(token!==session)return;
       canvas=await R.render({date:data.date,mode:mode(),photos,totalPhotos:data.photos.length,mapCanvas:snapshot,pins,hasRoute:!!data.route,distanceLabel:data.route?C.formatDistance(C.totalDistance([data.route])):'未確定',routeNote:!data.route?'ルートを確認して保存すると、この日の距離を掲載できます。':data.route.segments.some(s=>s.kind!=='road')?'１日全体の距離 · 手動・直線区間を含む概算です。':'１日全体の距離 · 保存済みルートに基づく目安です。'}, {
-        createCanvas:(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;},decodeImage,releaseImage:img=>img.close?.(),cancelled:()=>token!==session,
+        createCanvas:(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;},decodeImage:async(_,photo)=>{const blob=await TravelStore.getPhotoBlob(photo.id);if(token!==session)throw new Error('作成を中止しました。');return PhotoImages.decode(blob);},releaseImage:PhotoImages.release,cancelled:()=>token!==session,
         onProgress:(done,total)=>{if(token===session)status(`写真を配置しています… ${done} / ${total}枚`);}
       });
       const result=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('画像を作成できませんでした。写真の枚数を減らして再度お試しください。')),'image/png'));
@@ -104,9 +99,10 @@
     if($('reportDialog').open)return;
     clear();data={date:value.date,photos:value.photos.map(p=>({...p,point:p.point?[...p.point]:null})),route:value.route?.confirmed?JSON.parse(JSON.stringify(value.route)):null};mapError=false;selected=new Set();
     $('reportAllMode').checked=true;$('reportSelectedMode').checked=false;$('reportDate').textContent=data.date+' の記録';$('reportChoices').replaceChildren();
+    photoPreviews=PhotoImages.previews($('reportChoices'));
     data.photos.forEach((p,i)=>{
       const label=document.createElement('label');label.className='report-choice';const input=document.createElement('input');input.type='checkbox';input.value=p.id;input.setAttribute('aria-label',`写真 ${i+1} を掲載`);
-      const img=document.createElement('img'),url=URL.createObjectURL(p.blob);thumbUrls.push(url);img.src=url;img.alt='';img.loading='lazy';
+      const img=document.createElement('img');img.alt='';photoPreviews.observe(img,p.id);
       const text=document.createElement('span');text.textContent=`写真 ${i+1} · ${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'}).format(new Date(p.capturedAt))}${p.title?' · '+p.title:''}${p.point?'':'（地点未設定）'}`;
       input.addEventListener('change',()=>{if(input.checked){selected.add(p.id);}else selected.delete(p.id);configure();});label.append(input,img,text);$('reportChoices').append(label);
     });

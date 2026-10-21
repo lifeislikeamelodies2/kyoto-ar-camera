@@ -55,7 +55,7 @@
       if(env.cancelled?.())throw new Error('作成を中止しました。');
       const p=data.photos[i],x=48+(i%2)*(L.cardW+L.gap),y=L.gridY+Math.floor(i/2)*(L.cardH+L.gap);
       ctx.fillStyle='#fffdf8';ctx.fillRect(x,y,L.cardW,L.cardH);ctx.strokeStyle='#ded7c6';ctx.lineWidth=1;ctx.strokeRect(x,y,L.cardW,L.cardH);
-      const img=await env.decodeImage(p.blob);
+      const img=await env.decodeImage(p.blob,p);
       try{
         const iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;if(!iw||!ih)throw new Error('写真 '+p.number+' を読み込めませんでした。');
         const w=L.cardW-24,h=285,scale=Math.min(w/iw,h/ih);
