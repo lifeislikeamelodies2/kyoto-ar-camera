@@ -215,3 +215,7 @@ h1 span{color:#f0b3b9}
 .history-entry--clickable:hover,.history-entry--clickable:focus-visible{background:#f4e4ec;outline:2px solid #dbb7ce;outline-offset:2px}
 @media(max-width:480px){.detail-section{padding:12px 12px}.fortune-detail-list{gap:8px}.detail-section h3{font-size:11px}.detail-voice{font-size:11px}.fortune-detail-list .fortune-message{font-size:12px}}
 @media(prefers-reduced-motion:reduce){.is-secret-rare .result-avatar:after{animation:none}}
+/* 創作ネタとシチュエーションは一つの会話として表示 */
+.detail-section--story{background:#fffbf8;border-color:#eacfcf}
+.story-divider{height:1px;margin:14px 0;background:#eadcdc}
+.detail-voice--story{margin-top:13px;padding:12px 13px;border-radius:11px;background:#f8f0f1;color:#6b4c63;line-height:1.9}
