@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#251b36">
+  <meta name="description" content="ハンドルを回して、SDキャラクターから今日の運勢を受け取るガチャ占い。">
+  <title>福よびガチャ | SDキャラの占い</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="characters.js"></script>
+  <script defer src="fortune-extras.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="page-glow" aria-hidden="true"></div>
+  <main class="app">
+    <header class="site-header">
+      <p class="eyebrow"><span class="header-star">✧</span> 今日のご縁をひとまわし <span class="header-star">✧</span></p>
+      <h1>福よび<span>ガチャ</span></h1>
+      <p class="site-lead">ハンドルを回すと、誰かがあなたの運勢を届けにきます。</p>
+    </header>
+
+    <div class="game-grid">
+      <section class="game-stage" aria-label="占いガチャマシン">
+        <div class="stage-stars" aria-hidden="true">✧ <span>⋆</span> ✦ <span>✧</span></div>
+        <div class="machine" id="machine">
+          <div class="machine__dome">
+            <div class="machine__glow"></div>
+            <div class="small-capsules" aria-hidden="true">
+              <span class="tiny-capsule" style="--x:13%;--y:36%;--turn:-28deg;--tone:#f2acb1;--delay:.02s"></span>
+              <span class="tiny-capsule" style="--x:38%;--y:17%;--turn:20deg;--tone:#d3b7e8;--delay:.11s"></span>
+              <span class="tiny-capsule" style="--x:65%;--y:23%;--turn:-12deg;--tone:#afd7cf;--delay:.21s"></span>
+              <span class="tiny-capsule" style="--x:77%;--y:48%;--turn:35deg;--tone:#efd39c;--delay:.07s"></span>
+              <span class="tiny-capsule" style="--x:51%;--y:49%;--turn:-40deg;--tone:#f2acb1;--delay:.17s"></span>
+              <span class="tiny-capsule" style="--x:22%;--y:67%;--turn:22deg;--tone:#afd7cf;--delay:.15s"></span>
+              <span class="tiny-capsule" style="--x:42%;--y:74%;--turn:0deg;--tone:#efd39c;--delay:.25s"></span>
+              <span class="tiny-capsule" style="--x:69%;--y:72%;--turn:-14deg;--tone:#d3b7e8;--delay:.12s"></span>
+            </div>
+            <span class="glass-shine glass-shine--left"></span>
+            <span class="glass-shine glass-shine--right"></span>
+          </div>
+          <div class="machine__rim"></div>
+          <div class="machine__body">
+            <div class="machine__brand"><span>✦</span> FUKUYOBI <span>✦</span><small>FORTUNE CAPSULE</small></div>
+            <div class="machine__coin">いつでも <strong>FREE</strong></div>
+            <button id="crank" class="crank" aria-label="ハンドルを回してガチャ占いをする" type="button">
+              <span class="crank__plate"><span class="crank__arm"><span class="crank__knob"></span></span></span>
+            </button>
+            <div class="outlet" aria-hidden="true"><div class="outlet__dark"><span class="outlet__gleam"></span></div><span class="outlet__label">出口</span></div>
+            <div class="machine__deco" aria-hidden="true">✧ ⋆ ✧</div>
+          </div>
+          <div class="machine__feet" aria-hidden="true"><span></span><span></span></div>
+          <div class="falling-capsule" id="fallingCapsule" aria-hidden="true"><span></span></div>
+        </div>
+        <div class="spin-guidance" id="spinGuidance">
+          <span class="guidance-arrow" aria-hidden="true">↻</span>
+          <strong>ハンドルをタップして回してね</strong>
+          <span class="guidance-spark" aria-hidden="true">✧</span>
+        </div>
+        <button type="button" class="primary-spin" id="spinButton">ガチャを回す <span>✦</span></button>
+      </section>
+
+      <aside class="side-panel" aria-label="占いガイド">
+        <div class="panel-heading"><span>✧</span><p>ちいさな出会いが<br>今日を変えるかも。</p></div>
+        <div class="panel-divider"></div>
+        <h2>登場するキャラクター <span id="characterTotal">全9種類</span></h2>
+        <p class="panel-note">出てくる子によって、占いの言葉も口調も変わるよ。<br>芹夢ちゃんは特別枠・出現率2％！</p>
+        <div class="character-roster" id="characterRoster" aria-label="キャラクター一覧"></div>
+        <div class="panel-divider"></div>
+        <div class="collection-heading"><h2>出会いの記録</h2><span id="collectionCounter">0 / 9</span></div>
+        <div class="collection-track" aria-hidden="true"><span id="collectionProgress"></span></div>
+        <p class="collection-note" id="collectionNote">まずは一回、運試ししてみよう。</p>
+        <div class="options-row">
+          <button type="button" class="soft-button" id="toggleSound" aria-pressed="true">♪ 効果音 ON</button>
+          <button type="button" class="soft-button" id="showHistory">履歴を見る</button>
+        </div>
+        <p class="fineprint">※ 占いはエンターテインメントです。結果はランダムに表示されます。</p>
+      </aside>
+    </div>
+    <footer class="site-footer">✦ &nbsp; May a little luck find you today. &nbsp; ✦</footer>
+  </main>
+
+  <div class="overlay" id="resultOverlay" hidden>
+    <div class="overlay-scrim" data-close="result"></div>
+    <section class="result-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle" tabindex="-1" id="resultDialog">
+      <button type="button" class="close-button" id="closeResult" aria-label="占い結果を閉じる">×</button>
+      <div class="capsule-phase" id="capsulePhase" aria-live="polite">
+        <p class="result-eyebrow">✧ &nbsp; LUCKY CAPSULE &nbsp; ✧</p>
+        <div class="giant-capsule" id="giantCapsule" aria-label="カプセルが開きます"><span class="giant-capsule__top"></span><span class="giant-capsule__bottom"></span><span class="giant-capsule__gloss"></span></div>
+        <p class="capsule-message">どんな子が出てくるかな……？</p>
+      </div>
+      <div class="reading-phase" id="readingPhase" hidden>
+        <p class="result-eyebrow">✧ &nbsp; YOU GOT A FORTUNE! &nbsp; ✧</p>
+        <div class="result-avatar" id="resultAvatar" aria-hidden="true"></div>
+        <p class="rarity-banner" id="rarityBanner" hidden>✦ &nbsp; SECRET RARE — 2% &nbsp; ✦</p>
+        <p class="character-title" id="characterTitle"></p>
+        <h2 class="character-name" id="resultTitle"></h2>
+        <p class="reading-date" id="readingDate"></p>
+        <div class="rank-line">今日の運勢は <strong class="fortune-rank" id="fortuneRank"></strong></div>
+        <div class="fortune-detail-list">
+          <div class="detail-section detail-section--main">
+            <h3><span class="detail-number">01</span> 今日のあなたの運勢・総評</h3>
+            <blockquote class="fortune-message" id="fortuneMessage"></blockquote>
+          </div>
+          <div class="detail-section">
+            <h3><span class="detail-number">02</span> アドバイス</h3>
+            <p class="detail-voice" id="fortuneAdvice"></p>
+          </div>
+          <div class="detail-section">
+            <h3><span class="detail-number">03</span> ラッキーアイテム</h3>
+            <strong class="detail-value" id="luckyItem"></strong>
+          </div>
+          <div class="detail-section">
+            <h3><span class="detail-number">04</span> ラッキーパーソン</h3>
+            <strong class="detail-value" id="luckyPerson"></strong>
+            <p class="detail-voice" id="luckyPersonLine"></p>
+          </div>
+          <div class="detail-section">
+            <h3><span class="detail-number">05</span> ラッキーカラー</h3>
+            <div class="color-detail"><span class="color-swatch" id="colorSwatch"></span><strong class="detail-value" id="luckyColor"></strong></div>
+            <p class="detail-voice" id="luckyNote"></p>
+          </div>
+          <div class="detail-section">
+            <h3><span class="detail-number">06</span> ラッキー創作ネタ</h3>
+            <strong class="detail-value" id="creativePrompt"></strong>
+            <p class="detail-voice" id="creativeLine"></p>
+          </div>
+          <div class="detail-section">
+            <h3><span class="detail-number">07</span> ラッキーシチュエーション</h3>
+            <strong class="detail-value" id="luckySituation"></strong>
+            <p class="detail-voice" id="situationLine"></p>
+          </div>
+          <div class="detail-section detail-section--music">
+            <h3><span class="detail-number">08</span> おすすめの楽曲</h3>
+            <strong class="detail-value" id="songTitle"></strong>
+            <p class="detail-voice" id="songLine"></p>
+            <a class="youtube-link" id="songLink" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer">YouTubeで公式MVを見る ↗</a>
+          </div>
+        </div>
+        <div class="result-buttons">
+          <button type="button" id="readAloud" class="result-button result-button--light">♪ 全項目を読み上げ</button>
+          <button type="button" id="shareResult" class="result-button result-button--light">↗ 結果をシェア</button>
+        </div>
+        <button type="button" id="spinAgain" class="result-button result-button--main">もう一回まわす &nbsp; ✦</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="overlay" id="historyOverlay" hidden>
+    <div class="overlay-scrim" data-close="history"></div>
+    <section class="history-card" role="dialog" aria-modal="true" aria-labelledby="historyTitle" tabindex="-1" id="historyDialog">
+      <button type="button" class="close-button" id="closeHistory" aria-label="履歴を閉じる">×</button>
+      <p class="result-eyebrow">✧ &nbsp; MEMORIES &nbsp; ✧</p>
+      <h2 id="historyTitle">出会いの記録</h2>
+      <p class="history-subtitle">この端末に、直近30回の記録を保存します。各項目をもう一度見られます。</p>
+      <div class="history-list" id="historyList"></div>
+      <button type="button" class="clear-history" id="clearHistory">履歴と収集記録を消去する</button>
+    </section>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
