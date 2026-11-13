@@ -27,6 +27,7 @@ https://lifeislikeamelodies2.github.io/kyoto-ar-camera/fortune-gacha/
 - `dialogue-v2.txt`：基本の会話強化パック（gzip + Base64データ）
 - `character-conversation-v3.js`：キャラクターの関係性・言い回し・創作ネタとシチュエーションを結ぶ会話データ
 - `serizawa-memories-v6.js`：芹沢が故郷の女性を思い出す追加台詞と「？？？」の表示名設定（元画像のファイル名・抽選IDは維持）
+- `serizawa-relations-v7.js`：芹沢の話題を再配分し、約20％を過去の女性の回想、約80％を新見・平山・近藤・土方・藤雨などとの関係性に充てる。運勢・アイテム・人物・和色・創作・楽曲紹介に適用。割合は用意した台詞の内訳で、各回の占い結果に必ず同じ割合が現れるわけではありません。
 
 `dialogue-v2.txt` は編集用ファイルではありません。今回追加した関係性や台詞は `character-conversation-v3.js` を編集してください。基本データそのものを変える場合のみ、`dialogue-v2.txt` の再生成が必要です。
 
