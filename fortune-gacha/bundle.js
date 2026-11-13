@@ -1,23 +1,35 @@
-/* 福よびガチャ配信用ローダー。ソース編集用一式は元のZIPを参照。 */
+/* 福よびガチャ配信用ローダー。既存のガチャデータと会話強化パックを順番に読み込みます。 */
 (async () => {
-  const files = Array.from({ length: 7 }, (_, i) => './payload-' + String(i + 1).padStart(2, '0') + '.txt');
-  const parts = await Promise.all(files.map(async file => {
+  async function readText(file) {
     const response = await fetch(file, { cache: 'no-store' });
     if (!response.ok) throw new Error(file + ': HTTP ' + response.status);
     return response.text();
-  }));
-  const encoded = parts.join('').replace(/\s/g, '');
-  const compressed = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
-  if (typeof DecompressionStream !== 'function') throw new Error('このブラウザは圧縮ファイルの展開に対応していません。');
-  const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
-  const scriptText = await new Response(stream).text();
-  if (!scriptText.includes('FORTUNE_CHARACTERS') || !scriptText.includes('FORTUNE_WACOLORS')) {
+  }
+  async function inflate(encoded) {
+    const bytes = Uint8Array.from(atob(encoded.replace(/\s/g, '')), c => c.charCodeAt(0));
+    if (typeof DecompressionStream !== 'function') throw new Error('このブラウザは圧縮ファイルの展開に対応していません。');
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Response(stream).text();
+  }
+  function execute(source) {
+    const script = document.createElement('script');
+    script.textContent = source;
+    document.body.appendChild(script);
+    script.remove();
+  }
+
+  const dialogue = await inflate(await readText('./dialogue-v2.txt'));
+  execute(dialogue);
+  if (!window.FORTUNE_DIALOGUE_V2?.patchSource) throw new Error('キャラクターの会話データを読み込めませんでした。');
+
+  const files = Array.from({ length: 7 }, (_, i) => './payload-' + String(i + 1).padStart(2, '0') + '.txt');
+  const encodedParts = await Promise.all(files.map(readText));
+  let source = await inflate(encodedParts.join(''));
+  if (!source.includes('FORTUNE_CHARACTERS') || !source.includes('FORTUNE_WACOLORS')) {
     throw new Error('占いデータの整合性を確認できませんでした。');
   }
-  const script = document.createElement('script');
-  script.textContent = scriptText;
-  document.body.appendChild(script);
-  script.remove();
+  source = window.FORTUNE_DIALOGUE_V2.patchSource(source);
+  execute(source);
 })().catch(error => {
   console.error('Fortune Gacha load failed:', error);
   const hint = document.getElementById('spinGuidance');
