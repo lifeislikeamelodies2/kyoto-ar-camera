@@ -26,6 +26,8 @@
   if (!window.FORTUNE_DIALOGUE_V3) throw new Error('キャラクターの追加会話を読み込めませんでした。');
   execute(await readText('./interaction-v4.js'));
   if (!window.FORTUNE_PLAYLIST) throw new Error('新しい抽選処理を読み込めませんでした。');
+  execute(await readText('./serizawa-memories-v6.js'));
+  if (!window.FORTUNE_SERIZAWA_MEMORIES_V6?.ready) throw new Error('芹沢の追加台詞を読み込めませんでした。');
 
   const files = Array.from({ length: 7 }, (_, i) => './payload-' + String(i + 1).padStart(2, '0') + '.txt');
   const encodedParts = await Promise.all(files.map(readText));
