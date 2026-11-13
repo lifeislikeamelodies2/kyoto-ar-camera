@@ -207,11 +207,11 @@
     if(!closings[who])return text;
     if(who==='serizawa'){
       for(const ending of serizawaFixed)if(text.endsWith(ending)){text=text.slice(0,-ending.length).trimEnd();break;}
-    }else if(fixed[id] && text.endsWith(fixed[id])){
-      text=text.slice(0,-fixed[id].length).trimEnd();
+    }else if(fixed[who] && text.endsWith(fixed[who])){
+      text=text.slice(0,-fixed[who].length).trimEnd();
     }
     if(who==='yukio')text=text.replace(/主人/g,'あの人');
-    return (text+' '+closings[who][indexFor(id,prompt,situation,closings[who].length)]).trim();
+    return (text+closings[who][indexFor(id,prompt,situation,closings[who].length)]).trim();
   };
   window.FORTUNE_DIALOGUE_V8={ready:true,endingCounts:Object.fromEntries(Object.entries(closings).map(([name,items])=>[name,items.length]))};
 })();
