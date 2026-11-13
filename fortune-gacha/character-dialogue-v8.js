@@ -203,14 +203,15 @@
   }
   d.story=(id,prompt,situation)=>{
     let text=String(previousStory(id,prompt,situation)||'');
-    if(!closings[id])return text;
-    if(id==='serizawa'){
+    const who=id==='saeki-original'?'saeki':id;
+    if(!closings[who])return text;
+    if(who==='serizawa'){
       for(const ending of serizawaFixed)if(text.endsWith(ending)){text=text.slice(0,-ending.length).trimEnd();break;}
     }else if(fixed[id] && text.endsWith(fixed[id])){
       text=text.slice(0,-fixed[id].length).trimEnd();
     }
-    if(id==='yukio')text=text.replace(/主人/g,'あの人');
-    return (text+' '+closings[id][indexFor(id,prompt,situation,closings[id].length)]).trim();
+    if(who==='yukio')text=text.replace(/主人/g,'あの人');
+    return (text+' '+closings[who][indexFor(id,prompt,situation,closings[who].length)]).trim();
   };
   window.FORTUNE_DIALOGUE_V8={ready:true,endingCounts:Object.fromEntries(Object.entries(closings).map(([name,items])=>[name,items.length]))};
 })();
