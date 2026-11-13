@@ -115,7 +115,7 @@
     },
     kusaka:{
       '何気ない約束を覚えている人':'藤雨は妙な約束ばかり覚えているのであります。……私が覚えていると知れば、また調子に乗るでしょうな。',
-      '最近会っていなかった友人':'高杉さんとは、次に会えばまた議論になるでしょう。君もあの勢いには圧倒されるであります。',
+      '最近会っていなかった友人':'高杉さんとは、次に会えばまた議論になるでしょう。君もあの勢いには圧倒されるかもしれませんな。',
       'お茶を一緒に楽しめる人':'藤雨は話し始めると止まらないのです。……もっとも、聞き飽きたわけではないのでありますが。',
       'まっすぐ意見を言ってくれる人':'佐伯さんを相手にすると、もっともな話も冗談にされます。君も甘く見られぬようになさい。',
       'さりげなく手を貸してくれる人':'稔磨さんのように、必要なことを必要なときになさる方には学ぶところが多いであります。'
@@ -299,5 +299,19 @@
     }
     return patched;
   };
+
+  // 古い履歴でも、画面と読み上げの両方が最新の会話を使用する。
+  const patchSpeech=d.patchSource;
+  d.patchSource=source=>{
+    let updated=patchSpeech(source);
+    const changes=[
+      ["reading.itemLine || window.FORTUNE_DIALOGUE_V2.item(character.id,reading.item)", "window.FORTUNE_DIALOGUE_V2.item(character.id,reading.item)"],
+      ["reading.creativeSceneLine || window.FORTUNE_DIALOGUE_V2.story(character.id,reading.creativePrompt,reading.situation)", "window.FORTUNE_DIALOGUE_V2.story(character.id,reading.creativePrompt,reading.situation)"],
+      [", reading.songLine\n", ", window.FORTUNE_DIALOGUE_V3.song(character.id,reading.song)\n"]
+    ];
+    for(const [from,to] of changes) updated=updated.replaceAll(from,to);
+    return updated;
+  };
+
   window.FORTUNE_DIALOGUE_V3=extra;
 })();
