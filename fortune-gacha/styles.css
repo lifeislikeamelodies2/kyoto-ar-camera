@@ -215,7 +215,19 @@ h1 span{color:#f0b3b9}
 .history-entry--clickable:hover,.history-entry--clickable:focus-visible{background:#f4e4ec;outline:2px solid #dbb7ce;outline-offset:2px}
 @media(max-width:480px){.detail-section{padding:12px 12px}.fortune-detail-list{gap:8px}.detail-section h3{font-size:11px}.detail-voice{font-size:11px}.fortune-detail-list .fortune-message{font-size:12px}}
 @media(prefers-reduced-motion:reduce){.is-secret-rare .result-avatar:after{animation:none}}
-/* 創作ネタとシチュエーションは一つの会話として表示 */
+
+/* 創作ネタとシチュエーションは、一つの会話として表示する */
 .detail-section--story{background:#fffbf8;border-color:#eacfcf}
 .story-divider{height:1px;margin:14px 0;background:#eadcdc}
 .detail-voice--story{margin-top:13px;padding:12px 13px;border-radius:11px;background:#f8f0f1;color:#6b4c63;line-height:1.9}
+
+
+/* v4: カプセルは結果画面で一度だけ出現。抽選ごとに異なる色になる。 */
+.machine.is-spinning .falling-capsule{display:none!important}
+.giant-capsule__top{background:linear-gradient(130deg,#fff9f8 0,var(--capsule-light,#e5d4ff) 28%,var(--capsule-dark,#a287d4) 100%);border-bottom-color:var(--capsule-rim,#7657a7)}
+.giant-capsule__bottom{border-top-color:var(--capsule-rim,#7657a7);background:linear-gradient(115deg,#fffdf7,#fdf1ea 65%,var(--capsule-light,#e5d4ff))}
+.giant-capsule:not(.is-opening){animation:capsuleArrive .55s cubic-bezier(.22,1.4,.42,1) both}
+@keyframes capsuleArrive{from{opacity:0;transform:translateY(-42px) scale(.5) rotate(-15deg)}to{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
+.youtube-preview{margin-top:13px;min-height:200px;display:flex;align-items:center;justify-content:center;background:#f7eaf1;border:1px solid #ead7e2;border-radius:12px;color:#8e7384;font-size:12px;text-align:center;overflow:hidden}
+.youtube-preview iframe{display:block;max-width:100%;width:100%;min-height:200px;aspect-ratio:16/10;border:0}
+@media (prefers-reduced-motion:reduce){.giant-capsule:not(.is-opening){animation:none}}
