@@ -21,6 +21,9 @@
   const dialogue = await inflate(await readText('./dialogue-v2.txt'));
   execute(dialogue);
   if (!window.FORTUNE_DIALOGUE_V2?.patchSource) throw new Error('キャラクターの会話データを読み込めませんでした。');
+  // 関係性と雑談を強化し、創作ネタと場面を一つの会話にまとめます。
+  execute(await readText('./character-conversation-v3.js'));
+  if (!window.FORTUNE_DIALOGUE_V3) throw new Error('キャラクターの追加会話を読み込めませんでした。');
 
   const files = Array.from({ length: 7 }, (_, i) => './payload-' + String(i + 1).padStart(2, '0') + '.txt');
   const encodedParts = await Promise.all(files.map(readText));
