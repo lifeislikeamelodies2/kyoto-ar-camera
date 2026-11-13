@@ -92,9 +92,25 @@
 
   // 呼びかけとして唐突に挟まる「君、」「あなた、」だけを除き、
   // 「君の」「あなたに」など意味を持つ語句は削除しない。
+  // 発言全体を飾る括弧だけを除去。会話の途中で別の人物を引用した「」は残す。
+  function stripOuterDialogueQuotes(value) {
+    let result = String(value ?? '').trim();
+    const enclosesWholeLine = (s) => {
+      if (!s.startsWith('「') || !s.endsWith('」')) return false;
+      let depth = 0;
+      for (let i = 0; i < s.length; i++) {
+        if (s[i] === '「') depth++;
+        else if (s[i] === '」') depth--;
+        if (depth < 0 || (depth === 0 && i < s.length - 1)) return false;
+      }
+      return depth === 0;
+    };
+    while (enclosesWholeLine(result)) result = result.slice(1, -1).trim();
+    return result;
+  }
   function cleanVocative(line) {
     if (!line) return '';
-    return String(line)
+    return stripOuterDialogueQuotes(line)
       .replace(/(^|[。！？!?]\s*|「\s*)(?:あなた|君)[、，]\s*/g,'$1')
       .replace(/([、，]\s*)(?:あなた|君)[、，]\s*/g,'$1')
       .replace(/(ねえ|あのね|ところで)[、，]\s*(?:あなた|君)[、，]\s*/g,'$1、');
