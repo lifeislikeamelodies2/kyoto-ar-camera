@@ -28,6 +28,8 @@
   if (!window.FORTUNE_PLAYLIST) throw new Error('新しい抽選処理を読み込めませんでした。');
   execute(await readText('./serizawa-memories-v6.js'));
   if (!window.FORTUNE_SERIZAWA_MEMORIES_V6?.ready) throw new Error('芹沢の追加台詞を読み込めませんでした。');
+  execute(await readText('./serizawa-relations-v7.js'));
+  if (!window.FORTUNE_SERIZAWA_RELATIONS_V7?.ready) throw new Error('芹沢の関係性別の会話を読み込めませんでした。');
 
   const files = Array.from({ length: 7 }, (_, i) => './payload-' + String(i + 1).padStart(2, '0') + '.txt');
   const encodedParts = await Promise.all(files.map(readText));
