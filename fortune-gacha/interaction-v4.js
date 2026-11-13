@@ -200,7 +200,7 @@
       "advice:window.FORTUNE_UX.polish(character.id,character.id === 'seriyume' ? window.FORTUNE_DIALOGUE_V3.advice(rank) : pick(persona.advice[rank.tier])),",'助言');
     const tick=String.fromCharCode(96);
     post("$('fortuneMessage').textContent = "+tick+"「"+String.fromCharCode(36)+"{reading.message}」"+tick+";",
-      "$('fortuneMessage').textContent = "+tick+"「"+String.fromCharCode(36)+"{window.FORTUNE_UX.polish(character.id,reading.message)}」"+tick+";",'履歴の総評');
+      "$('fortuneMessage').textContent = window.FORTUNE_UX.polish(character.id,reading.message);",'履歴の総評');
     post("$('fortuneAdvice').textContent = reading.advice || '今日はゆっくり自分のペースで進もう。';",
       "$('fortuneAdvice').textContent = window.FORTUNE_UX.polish(character.id,reading.advice || '今日はゆっくり自分のペースで進もう。');",'履歴の助言');
     post("$('songLine').textContent = window.FORTUNE_DIALOGUE_V3.song(character.id,reading.song) || '';",
