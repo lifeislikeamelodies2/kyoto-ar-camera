@@ -122,6 +122,33 @@
   }
   window.FORTUNE_UX = { cleanVocative, setCapsuleColor };
 
+  function polish(id,raw){
+    if(raw==null)return '';
+    let s=String(raw);
+    if(id==='serizawa'){
+      s=s.replace(/[、，]\s*いしゃあ(?=[。！？!?]|$)/g,'');
+      s=s.replace(/(^|[。！？!?]\s*)いしゃあ(?=[。！？!?]|$)/g,'$1');
+    }
+    if(id==='saeki'||id==='saeki-original'){
+      s=s.replace(/あんたの願いが何か/g,'何を願ったのか').replace(/あんたの名前でも/g,'名前でも')
+        .replace(/あんたの行く先/g,'これから進む先').replace(/あんたの勘/g,'今日の勘')
+        .replace(/あんたの運/g,'今日の運').replace(/あんたは何味派/g,'好きなのは何味っすか')
+        .replace(/あんたが来たって/g,'誰か来たって')
+        .replace(/あんたも[、，]?\s*一緒に/g,'一緒に').replace(/あんたも感想/g,'感想')
+        .replace(/あんた[、，]\s*/g,'').replace(/あんたも/g,'一緒に')
+        .replace(/あんたが/g,'そっちが').replace(/あんたの/g,'そっちの')
+        .replace(/あんたは/g,'そっちは').replace(/あんたに/g,'そっちに')
+        .replace(/あんたと/g,'一緒に').replace(/あんた/g,'');
+    }
+    return s;
+  }
+  window.FORTUNE_UX.polish=polish;
+  for(const key of ['item','person','color','story']){
+    const original=base[key].bind(base);
+    base[key]=(id,...args)=>polish(id,original(id,...args));
+  }
+
+
   const patchBefore = base.patchSource.bind(base);
   base.patchSource = (source) => {
     let out = patchBefore(source);
@@ -163,6 +190,23 @@
   toggleSoundButton.textContent = soundEnabled ? '♪ 効果音 ON' : '♪ 効果音 OFF';`,'playlist selection callback');
     replace("const spoken = sections.filter(Boolean).join('　').replace(/笑/g,'ふふ');",
       "const spoken = sections.filter(Boolean).map(window.FORTUNE_UX.cleanVocative).join('　').replace(/笑/g,'ふふ');",'speech cleanup');
+
+    const post=(before,after,label)=>{
+      if(!out.includes(before))throw Error('口調修正の対象がありません: '+label);
+      out=out.replace(before,after);
+    };
+    post('message:fortune,','message:window.FORTUNE_UX.polish(character.id,fortune),','総評');
+    post("advice:character.id === 'seriyume' ? window.FORTUNE_DIALOGUE_V3.advice(rank) : pick(persona.advice[rank.tier]),",
+      "advice:window.FORTUNE_UX.polish(character.id,character.id === 'seriyume' ? window.FORTUNE_DIALOGUE_V3.advice(rank) : pick(persona.advice[rank.tier])),",'助言');
+    const tick=String.fromCharCode(96);
+    post("$('fortuneMessage').textContent = "+tick+"「"+String.fromCharCode(36)+"{reading.message}」"+tick+";",
+      "$('fortuneMessage').textContent = "+tick+"「"+String.fromCharCode(36)+"{window.FORTUNE_UX.polish(character.id,reading.message)}」"+tick+";",'履歴の総評');
+    post("$('fortuneAdvice').textContent = reading.advice || '今日はゆっくり自分のペースで進もう。';",
+      "$('fortuneAdvice').textContent = window.FORTUNE_UX.polish(character.id,reading.advice || '今日はゆっくり自分のペースで進もう。');",'履歴の助言');
+    post("$('songLine').textContent = window.FORTUNE_DIALOGUE_V3.song(character.id,reading.song) || '';",
+      "$('songLine').textContent = window.FORTUNE_UX.polish(character.id,reading.songLine || (reading.songLine = window.FORTUNE_DIALOGUE_V3.song(character.id,reading.song)) || '');",'楽曲台詞保持');
+    post("const spoken = sections.filter(Boolean).map(window.FORTUNE_UX.cleanVocative).join('　').replace(/笑/g,'ふふ');",
+      "const spoken = sections.filter(Boolean).map(line => window.FORTUNE_UX.polish(character.id,window.FORTUNE_UX.cleanVocative(line))).join('　').replace(/笑/g,'ふふ');",'読み上げ');
     return out;
   };
 })();
